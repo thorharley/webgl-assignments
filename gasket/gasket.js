@@ -1,6 +1,7 @@
 var points = [];
 var ITERATIONS;
 var THETA;
+var SCALE;
 var canvas;
 var iterationsInput;
 var twistInput;
@@ -8,6 +9,7 @@ var twistInput;
 window.onload = function init() {
     iterationsInput = document.getElementById('iterations');
     twistInput = document.getElementById('twist');
+    scaleInput = document.getElementById('scale');
     canvas = document.getElementById('gl-canvas');
     gl = WebGLUtils.setupWebGL(canvas);
     if (!gl) {
@@ -64,15 +66,16 @@ function render() {
 var refresh = function() {
     ITERATIONS = parseFloat(iterationsInput.value);
     THETA = parseFloat(twistInput.value);
+    SCALE = parseFloat(scaleInput.value);
 
     points = [];
 
     /* Initial triangle */
 
     var vertices = [
-        vec2(-0.5, -0.5),
-        vec2(0, 0.5),
-        vec2(0.5, -0.5)
+        vec2(-SCALE*Math.cos(Math.PI/6), -SCALE*Math.sin(Math.PI/6)),
+        vec2(0, SCALE),
+        vec2(SCALE*Math.cos(Math.PI/6), -SCALE*Math.sin(Math.PI/6))
     ];
 
     divideTriangle(vertices[0], vertices[1], vertices[2], ITERATIONS);
@@ -96,5 +99,4 @@ var refresh = function() {
     gl.enableVertexAttribArray(vPosition);
 
     render();
-
 };
