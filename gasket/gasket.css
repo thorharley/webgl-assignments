@@ -1,0 +1,9 @@
+body {
+    position: relative;
+}
+.controls {
+    padding: 5px;
+}
+input {
+    width: 40px;
+}
