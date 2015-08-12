@@ -1,0 +1,28 @@
+<html>
+<head>
+<script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/webgl-utils.js'></script>
+<script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/initShaders.js'></script>
+<script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/MV.js'></script>
+<script type="text/javascript" src='draw.js'></script>
+
+<script id='vertex-shader' type='x-shader/x-vertex'>
+    attribute vec4 vPosition;
+    void main() {
+        gl_Position = vPosition;
+    }
+</script>
+<script id='fragment-shader' type='x-shader/x-fragment'>
+    precision mediump float;
+    void main() {
+        gl_FragColor = vec4(1.0,1.0,0.0,1.0);
+    }
+</script>
+
+<body style="margin: 0">   
+    <canvas id='gl-canvas' width='500' height='500' onmousemove="return mouseMove(event)"></canvas>
+    <div>
+        <button onClick='clearCanvas();'>Clear canvas</button>
+    </div>
+</body>
+</head>
+</html>
