@@ -1,0 +1,13 @@
+body {
+	position: relative;
+  font: 12px sans-serif;
+}
+input {
+  width: 50px;
+}
+.create-label {
+  font-weight: bold;
+}
+.dimension-label {
+
+}
