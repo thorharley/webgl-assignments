@@ -6,8 +6,12 @@ input {
   width: 50px;
 }
 .create-label {
+  font-size: 14px;
   font-weight: bold;
 }
 .dimension-label {
 
+}
+.dimension-value {
+  margin-right: 40px;
 }
