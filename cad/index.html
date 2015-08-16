@@ -16,7 +16,7 @@ void main()
     vec3 c = cos( angles );
     vec3 s = sin( angles );
 
-    // Remeber: thse matrices are column-major
+    // Remember: thse matrices are column-major
     mat4 rx = mat4( 1.0,  0.0,  0.0, 0.0,
             0.0,  c.x,  s.x, 0.0,
             0.0, -s.x,  c.x, 0.0,
@@ -27,7 +27,6 @@ void main()
             s.y, 0.0,  c.y, 0.0,
             0.0, 0.0,  0.0, 1.0 );
 
-
     mat4 rz = mat4( c.z, -s.z, 0.0, 0.0,
             s.z,  c.z, 0.0, 0.0,
             0.0,  0.0, 1.0, 0.0,
@@ -35,7 +34,6 @@ void main()
 
     gl_Position = rz * ry * rx * vPosition;
 }
-
 
 </script>
 
@@ -63,21 +61,18 @@ main()
 <link href="cad.css" rel="stylesheet"></link>
 
 <body>
-<div>
-    <canvas id="gl-canvas" width="800" height="800">
-        Oops ... your browser doesn't support the HTML5 canvas element
-    </canvas>
-</div>
 
 <div>
-    <h2>Create Quadric</h2>
+    <h2>Quadric CAD Canvas</h2>
+    <span class='create-label'>Quadric: </span>
     <select id='quadric'>
+        <option value='sphere' selected='true'>Sphere</option>
         <option value='cone'>Cone</option>
-        <option value='cylinder' selected='true'>Cylinder</option>
-        <option value='sphere'>Sphere</option>
+        <option value='cylinder'>Cylinder</option>
     </select>
+    <button id='create' onClick='createNew();' title='Generate a new quadric with default values'>Create new</button>
     <div>
-        <span class='create-label'>Orientation:  </span>
+        <span class='create-label'>Orientation (about origin):  </span>
         <span>
             <span class='dimension-label'>X angle: </span>
             <input class='slider' id='xSlider' type='range' value='0' min='-180' max='180'/>
@@ -85,14 +80,15 @@ main()
         </span>
         <span>
             <span class='dimension-label'>Y angle: </span>
-            <input class='slider' id='ySlider' type='range' value='-20' min='-180' max='180'/>
-            <label class='dimension-value' id='yAngle'>45 degrees</label>
+            <input class='slider' id='ySlider' type='range' value='0' min='-180' max='180'/>
+            <label class='dimension-value' id='yAngle'>0 degrees</label>
         </span>
         <span>
             <span class='dimension-label'>Z angle: </span>
             <input class='slider' id='zSlider' type='range' value='0' min='-180' max='180'/>
             <label class='dimension-value' id='zAngle'>0 degrees</label>
         </span>
+        <button class='resetButton' onClick='resetOrientation();'>Reset</button>
     </div>
     <div>
         <span class='create-label'>Dimensions:  </span>
@@ -102,19 +98,63 @@ main()
             <label class='dimension-value' id='radius'>0.3 units</label>
         </span>
         <span>
-            <span class='dimension-label'>Length (cone or cylinder only): </span>
+            <span class='dimension-label'>Length (cone/cylinder only): </span>
             <input class='slider' id='lengthSlider' type='range' value='0.5' min='0.1' max='1' step='0.01'/>
             <label class='dimension-value' id='length'>0.5 units</label>
         </span>
+        <button class='resetButton' onClick='resetDimensions();'>Reset</button>
+    </div>
+    <div>
+        <span class='create-label'>Position:  </span>
+        <span>
+            <span class='dimension-label'>X: </span>
+            <input class='slider' id='xPosSlider' name='xPosSlider' type='range' value='0' min='-1' max='1' step='0.01'/>
+            <label class='dimension-value' id='xPos'>0 units</label>
+        </span>
+        <span>
+            <span class='dimension-label'>Y: </span>
+            <input class='slider' id='yPosSlider' type='range' value='0' min='-1' max='1' step='0.01'/>
+            <label class='dimension-value' id='yPos'>0 units</label>
+        </span>
+        <span>
+            <span class='dimension-label'>Z: </span>
+            <input class='slider' id='zPosSlider' type='range' value='0' min='-1' max='1' step='0.01'/>
+            <label class='dimension-value' id='zPos'>0 units</label>
+        </span>
+        <button class='resetButton' onClick='resetPosition();'>Reset</button>
     </div>
     </br>
-    <div><button onClick='addQuadric();'>Add</button></div>
+    <div>
+        <button id='save' onClick='addQuadric();' title='Commit quadric to canvas and reset controls'>Save to canvas</button>
+        <button onClick='resetAll();'>Reset all controls</button>
+    </div>
+</div>
+<div>
+    <span class='create-label'>Canvas orientation:  </span>
+    <span>
+        <span class='dimension-label'>X angle: </span>
+        <input class='slider' id='xCanvasSlider' type='range' value='0' min='-180' max='180'/>
+        <label class='dimension-value' id='xCanvasAngle'>0 degrees</label>
+    </span>
+    <span>
+        <span class='dimension-label'>Y angle: </span>
+        <input class='slider' id='yCanvasSlider' type='range' value='-20' min='-180' max='180'/>
+        <label class='dimension-value' id='yCanvasAngle'>45 degrees</label>
+    </span>
+    <span>
+        <span class='dimension-label'>Z angle: </span>
+        <input class='slider' id='zCanvasSlider' type='range' value='0' min='-180' max='180'/>
+        <label class='dimension-value' id='zCanvasAngle'>0 degrees</label>
+    </span>
+    <button class='resetButton' onClick='resetCanvasOrientation();'>Reset</button>
 </div>
 </br>
-<button onClick='clearCanvas();'>Clear canvas</button>
 
+<div id='canvasDiv'>
+    <canvas id="gl-canvas" width="800" height="800">
+        Oops ... your browser doesn't support the HTML5 canvas element
+    </canvas>
+</div>
 
 </body>
 </html>
-
-

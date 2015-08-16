@@ -4,21 +4,42 @@ var canvas;
 var gl;
 var fColor;
 
-var black = vec4(0.0, 0.0, 0.0, 1.0);
-var red = vec4(1.0, 0.0, 0.0, 1.0);
+var BLACK = vec4(0.0, 0.0, 0.0, 1.0);
+var RED = vec4(1.0, 0.0, 0.0, 1.0);
+var GREEN = vec4(0.4, 0.86, 0.4, 1.0);
 var DEGREES_PER_STEP = 6;
-
-//var NumVertices = 2*3*360/DEGREES_PER_STEP + 1;//2 * 362 + 1;
+var DEFAULT_RADIUS = 0.3;
+var DEFAULT_LENGTH = 0.5;
+var DEFAULT_X = 0;
+var DEFAULT_Y = 0;
+var DEFAULT_Z = 0;
+var DEFAULT_X_ANGLE = 0;
+var DEFAULT_Y_ANGLE = 0;
+var DEFAULT_Z_ANGLE = 0;
+var DEFAULT_X_CANVAS_ANGLE = 0;
+var DEFAULT_Y_CANVAS_ANGLE = -20;
+var DEFAULT_Z_CANVAS_ANGLE = 0;
 
 var conicPoints = [];
 var circlePoints = [];
 var sheetPoints = [];
 
+var conicPointsCommitted = [];
+var circlePointsCommitted = [];
+var sheetPointsCommitted = [];
+
 var selectedQuadric = 'sphere';
-var axis = 0;
-var theta = [0, -18, 0];
-var radius = 0.3;
-var length = 0.5;
+var theta = [DEFAULT_X_CANVAS_ANGLE, DEFAULT_Y_CANVAS_ANGLE, DEFAULT_Z_CANVAS_ANGLE];
+var radius = DEFAULT_RADIUS;
+var length = DEFAULT_LENGTH;
+var xPos = DEFAULT_X;
+var yPos = DEFAULT_Y;
+var zPos = DEFAULT_Z;
+var xAngle = DEFAULT_X_ANGLE;
+var yAngle = DEFAULT_Y_ANGLE;
+var zAngle = DEFAULT_Z_ANGLE;
+
+var hasEditableQuadric = false;
 
 var thetaLoc;
 var vBuffer;
@@ -32,8 +53,6 @@ window.onload = function init() {
     if (!gl) {
         alert("WebGL isn't available");
     }
-
-    buildVertices();
 
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(1.0, 1.0, 1.0, 1.0);
@@ -62,33 +81,111 @@ window.onload = function init() {
 
 function initUi() {
     $("#quadric").on("change", onSelectChange);
+    $("#xCanvasSlider").on("input", onCanvasAngleChange);
+    $("#yCanvasSlider").on("input", onCanvasAngleChange);
+    $("#zCanvasSlider").on("input", onCanvasAngleChange);
+    $("#radiusSlider").on("input", onRadiusChange);
+    $("#lengthSlider").on("input", onLengthChange);
+    $("#xPosSlider").on("input", onXPosChange);
+    $("#yPosSlider").on("input", onYPosChange);
+    $("#zPosSlider").on("input", onZPosChange);
     $("#xSlider").on("input", onAngleChange);
     $("#ySlider").on("input", onAngleChange);
     $("#zSlider").on("input", onAngleChange);
-    $("#radiusSlider").on("input", onRadiusChange);
-    $("#lengthSlider").on("input", onLengthChange);
+    var option = $("#quadric")[0].selectedOptions[0].value;
+    selectedQuadric = option;
+}
+
+function resetControls() {
+    resetOrientation();
+    resetDimensions();
+    resetPosition();
+    // resetCanvasOrientation();
+}
+var resetOrientation = function() {
+    $("#xSlider").val(DEFAULT_X_ANGLE).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_X_ANGLE + ' degrees');
+    $("#ySlider").val(DEFAULT_Y_ANGLE).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_Y_ANGLE + ' degrees');
+    $("#zSlider").val(DEFAULT_Z_ANGLE).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_Z_ANGLE + ' degrees');
+    xAngle = DEFAULT_X_ANGLE;
+    yAngle = DEFAULT_Y_ANGLE;
+    zAngle = DEFAULT_Z_ANGLE;
+    buildVertices();
+}
+var resetDimensions = function() {
+    $("#radiusSlider").val(DEFAULT_RADIUS).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_RADIUS + ' units');
+    $("#lengthSlider").val(DEFAULT_LENGTH).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_LENGTH + ' units');
+    radius = DEFAULT_RADIUS;
+    length = DEFAULT_LENGTH;
+    buildVertices();
+}
+var resetPosition = function() {
+    $("#xPosSlider").val(DEFAULT_X).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_X + ' units');
+    $("#yPosSlider").val(DEFAULT_Y).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_Y + ' units');
+    $("#zPosSlider").val(DEFAULT_Z).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_Z + ' units');
+    xPos = DEFAULT_X;
+    yPos = DEFAULT_Y;
+    zPos = DEFAULT_Z;
+    buildVertices();
+}
+var resetCanvasOrientation = function() {
+    $("#xCanvasSlider").val(DEFAULT_X_CANVAS_ANGLE).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_X_CANVAS_ANGLE + ' degrees');
+    $("#yCanvasSlider").val(DEFAULT_Y_CANVAS_ANGLE).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_Y_CANVAS_ANGLE + ' degrees');
+    $("#zCanvasSlider").val(DEFAULT_Z_CANVAS_ANGLE).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_Z_CANVAS_ANGLE + ' degrees');
+    theta = [DEFAULT_X_CANVAS_ANGLE, DEFAULT_Y_CANVAS_ANGLE, DEFAULT_Z_CANVAS_ANGLE];
+    buildVertices();
+}
+var resetAll = function() {
+    resetControls();
+    buildVertices();
+}
+var createNew = function() {
+    hasEditableQuadric = true;
+    buildVertices();
+}
+var addQuadric = function() {
+    conicPointsCommitted = conicPointsCommitted.concat(conicPoints);
+    circlePointsCommitted = circlePointsCommitted.concat(circlePoints);
+    sheetPointsCommitted = sheetPointsCommitted.concat(sheetPoints);
+    hasEditableQuadric = false;
+    resetControls();
 }
 var onSelectChange = function(e) {
     var option = e.target.selectedOptions[0].value;
     selectedQuadric = option;
-    buildVertices();
 }
-var onAngleChange = function(e) {
+var onCanvasAngleChange = function(e) {
     var value = e.target.value;
     var index;
     switch (e.target.id) {
-        case 'xSlider':
+        case 'xCanvasSlider':
             index = 0;
             break;
-        case 'ySlider':
+        case 'yCanvasSlider':
             index = 1;
             break;
-        case 'zSlider':
+        case 'zCanvasSlider':
             index = 2;
             break;
     }
     theta[index] = value;
     $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + ' degrees');
+    buildVertices();
+}
+var onAngleChange = function(e) {
+    var value = e.target.value;
+    switch (e.target.id) {
+        case 'xSlider':
+            xAngle = 2 * Math.PI * value / 360;
+            break;
+        case 'ySlider':
+            yAngle = 2 * Math.PI * value / 360;
+            break;
+        case 'zSlider':
+            zAngle = 2 * Math.PI * value / 360;
+            break;
+    }
+    $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + ' degrees');
+    buildVertices();
 }
 var onRadiusChange = function(e) {
     var value = e.target.value;
@@ -102,8 +199,29 @@ var onLengthChange = function(e) {
     $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + ' units');
     buildVertices();
 }
+var onXPosChange = function(e) {
+    var value = e.target.value;
+    xPos = parseFloat(value);
+    $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + ' units');
+    buildVertices();
+}
+var onYPosChange = function(e) {
+    var value = e.target.value;
+    yPos = parseFloat(value);
+    $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + ' units');
+    buildVertices();
+}
+var onZPosChange = function(e) {
+    var value = e.target.value;
+    zPos = parseFloat(value);
+    $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + ' units');
+    buildVertices();
+}
 
 function buildVertices() {
+    if (!hasEditableQuadric) {
+        return;
+    }
     circlePoints = [];
     sheetPoints = [];
     conicPoints = [];
@@ -120,9 +238,21 @@ function buildVertices() {
     }
 }
 
+function tX(x) {
+    return x + xPos;
+}
+
+function tY(y) {
+    return y + yPos;
+}
+
+function tZ(z) {
+    return z + zPos;
+}
+
 function cone() {
     circle(0);
-    conic()
+    conic();
 }
 
 function cylinder() {
@@ -132,7 +262,7 @@ function cylinder() {
 }
 
 function sphere() {
-    circleStrip(10,20);
+    circleStrip(10, 20);
     circleStrip(20, 30);
     circleStrip(30, 40);
     circleStrip(40, 50);
@@ -159,7 +289,7 @@ function circleCap(x, startLat) {
         var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
 
         var polarAngle = startLat * 2 * Math.PI / 360;
-        
+
         var x1 = radius * Math.cos(polarAngle);
         var x2 = x1;
         var x3 = x;
@@ -172,9 +302,9 @@ function circleCap(x, startLat) {
         var z2 = radius * Math.cos(angle2) * Math.sin(polarAngle);
         var z3 = 0;
 
-        vertices.push(vec4(x1, y1, z1, 1.0));
-        vertices.push(vec4(x2, y2, z2, 1.0));
-        vertices.push(vec4(x3, y3, z3, 1.0));
+        vertices.push(translate(rotate(vec4(x1, y1, z1, 1.0))));
+        vertices.push(translate(rotate(vec4(x2, y2, z2, 1.0))));
+        vertices.push(translate(rotate(vec4(x3, y3, z3, 1.0))));
     };
     for (var j = 0; j < 3 * 360 / DEGREES_PER_STEP; ++j) {
         conicPoints.push(vertices[j]);
@@ -206,10 +336,10 @@ function circleStrip(startLat, stopLat) {
         var z3 = radius * Math.cos(angle2) * Math.sin(polarAngle2);
         var z4 = radius * Math.cos(angle1) * Math.sin(polarAngle2);
 
-        vertices.push(vec4(x1, y1, z1, 1.0));
-        vertices.push(vec4(x2, y2, z2, 1.0));
-        vertices.push(vec4(x3, y3, z3, 1.0));
-        vertices.push(vec4(x4, y4, z4, 1.0));
+        vertices.push(translate(rotate(vec4(x1, y1, z1, 1.0))));
+        vertices.push(translate(rotate(vec4(x2, y2, z2, 1.0))));
+        vertices.push(translate(rotate(vec4(x3, y3, z3, 1.0))));
+        vertices.push(translate(rotate(vec4(x4, y4, z4, 1.0))));
     };
     for (var j = 0; j < 4 * 360 / DEGREES_PER_STEP; ++j) {
         sheetPoints.push(vertices[j]);
@@ -223,11 +353,11 @@ function circleStrip(startLat, stopLat) {
 function circle(xOffset) {
     var vertices = [];
     for (var i = 0; i < 360; i += DEGREES_PER_STEP) {
-        vertices.push(vec4(xOffset, 0, 0, 1.0));
+        vertices.push(translate(rotate(vec4(xOffset, 0, 0, 1.0))));
         var angle1 = i * 2 * Math.PI / 360;
         var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
-        vertices.push(vec4(xOffset, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0));
-        vertices.push(vec4(xOffset, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0));
+        vertices.push(translate(rotate(vec4(xOffset, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0))));
+        vertices.push(translate(rotate(vec4(xOffset, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0))));
     };
     for (var j = 0; j < 3 * 360 / DEGREES_PER_STEP; ++j) {
         circlePoints.push(vertices[j]);
@@ -240,13 +370,15 @@ function circle(xOffset) {
 function conic() {
     var vertices = [];
     for (var i = 0; i < 360; i += DEGREES_PER_STEP) {
-        vertices.push(vec4(length, 0, 0, 1.0));
+        vertices.push(translate(rotate(vec4(length, 0, 0, 1.0))));
         var angle1 = i * 2 * Math.PI / 360;
         var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
-        vertices.push(vec4(0, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0));
-        vertices.push(vec4(0, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0));
+        vertices.push(translate(rotate(vec4(0, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0))));
+        vertices.push(translate(rotate(vec4(0, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0))));
+
     };
     for (var j = 0; j < 3 * 360 / DEGREES_PER_STEP; ++j) {
+        var v1 = vertices[j];
         conicPoints.push(vertices[j]);
     }
     conicPoints.push(vertices[3 * 360 / DEGREES_PER_STEP - 1]);
@@ -259,10 +391,10 @@ function sheet() {
     for (var i = 0; i < 360; i += DEGREES_PER_STEP) {
         var angle1 = i * 2 * Math.PI / 360;
         var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
-        vertices.push(vec4(0, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0));
-        vertices.push(vec4(0, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0));
-        vertices.push(vec4(length, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0));
-        vertices.push(vec4(length, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0));
+        vertices.push(translate(rotate(vec4(0, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0))));
+        vertices.push(translate(rotate(vec4(0, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0))));
+        vertices.push(translate(rotate(vec4(length, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0))));
+        vertices.push(translate(rotate(vec4(length, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0))));
     };
     for (var j = 0; j < 4 * 360 / DEGREES_PER_STEP; ++j) {
         sheetPoints.push(vertices[j]);
@@ -271,6 +403,30 @@ function sheet() {
     sheetPoints.push(vertices[4 * 360 / DEGREES_PER_STEP - 1]);
     sheetPoints.push(vertices[4 * 360 / DEGREES_PER_STEP - 1]);
     sheetPoints.push(vertices[4 * 360 / DEGREES_PER_STEP - 1]);
+}
+
+function rotate(v) {
+    var x = v[0];
+    var y = v[1];
+    var z = v[2];
+    // Rotate about x
+    var x1 = x;
+    var y1 = y * Math.cos(xAngle) - z * Math.sin(xAngle);
+    var z1 = y * Math.sin(xAngle) + z * Math.cos(xAngle);
+    // Then about y
+    var x2 = z1 * Math.sin(yAngle) + x1 * Math.cos(yAngle);
+    var y2 = y1;
+    var z2 = z1 * Math.cos(yAngle) - x1 * Math.sin(yAngle);
+    // Then about z
+    var x3 = x2 * Math.cos(zAngle) - y2 * Math.sin(zAngle);
+    var y3 = x2 * Math.sin(zAngle) + y2 * Math.cos(zAngle);
+    var z3 = z2;
+
+    return vec4(x3, y3, z3, v[3]);
+}
+
+function translate(v) {
+    return vec4(tX(v[0]), tY(v[1]), tZ(v[2]), v[3]);
 }
 
 function render() {
@@ -282,10 +438,12 @@ function render() {
 
     gl.uniform3fv(thetaLoc, theta);
 
+    // Render current quadric
+
     for (var i = 0; i < circlePoints.length; i += 3) {
-        gl.uniform4fv(fColor, flatten(red));
+        gl.uniform4fv(fColor, flatten(RED));
         gl.drawArrays(gl.TRIANGLE_FAN, i, 3);
-        gl.uniform4fv(fColor, flatten(black));
+        gl.uniform4fv(fColor, flatten(BLACK));
         gl.drawArrays(gl.LINE_LOOP, i, 3);
     }
 
@@ -293,9 +451,9 @@ function render() {
     gl.bufferData(gl.ARRAY_BUFFER, flatten(sheetPoints), gl.DYNAMIC_DRAW);
 
     for (var i = 0; i < sheetPoints.length; i += 4) {
-        gl.uniform4fv(fColor, flatten(red));
+        gl.uniform4fv(fColor, flatten(RED));
         gl.drawArrays(gl.TRIANGLE_FAN, i, 4);
-        gl.uniform4fv(fColor, flatten(black));
+        gl.uniform4fv(fColor, flatten(BLACK));
         gl.drawArrays(gl.LINE_LOOP, i, 4);
     }
 
@@ -303,9 +461,41 @@ function render() {
     gl.bufferData(gl.ARRAY_BUFFER, flatten(conicPoints), gl.DYNAMIC_DRAW);
 
     for (var i = 0; i < conicPoints.length; i += 3) {
-        gl.uniform4fv(fColor, flatten(red));
+        gl.uniform4fv(fColor, flatten(RED));
         gl.drawArrays(gl.TRIANGLE_FAN, i, 3);
-        gl.uniform4fv(fColor, flatten(black));
+        gl.uniform4fv(fColor, flatten(BLACK));
+        gl.drawArrays(gl.LINE_LOOP, i, 3);
+    }
+
+    // Render committed quadrics
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(circlePointsCommitted), gl.DYNAMIC_DRAW);
+
+    for (var i = 0; i < circlePointsCommitted.length; i += 3) {
+        gl.uniform4fv(fColor, flatten(GREEN));
+        gl.drawArrays(gl.TRIANGLE_FAN, i, 3);
+        gl.uniform4fv(fColor, flatten(BLACK));
+        gl.drawArrays(gl.LINE_LOOP, i, 3);
+    }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(sheetPointsCommitted), gl.DYNAMIC_DRAW);
+
+    for (var i = 0; i < sheetPointsCommitted.length; i += 4) {
+        gl.uniform4fv(fColor, flatten(GREEN));
+        gl.drawArrays(gl.TRIANGLE_FAN, i, 4);
+        gl.uniform4fv(fColor, flatten(BLACK));
+        gl.drawArrays(gl.LINE_LOOP, i, 4);
+    }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(conicPointsCommitted), gl.DYNAMIC_DRAW);
+
+    for (var i = 0; i < conicPointsCommitted.length; i += 3) {
+        gl.uniform4fv(fColor, flatten(GREEN));
+        gl.drawArrays(gl.TRIANGLE_FAN, i, 3);
+        gl.uniform4fv(fColor, flatten(BLACK));
         gl.drawArrays(gl.LINE_LOOP, i, 3);
     }
 
