@@ -4,12 +4,21 @@
 <script id="vertex-shader" type="x-shader/x-vertex">
 
 attribute  vec4 vPosition;
+attribute  vec3 vNormal;
 attribute  vec4 vColor;
 
 uniform vec3 theta;
 
+uniform vec4 ambientProduct, diffuseProduct, specularProduct;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform vec4 lightPosition;
+uniform float shininess;
+
 void main()
 {
+
+     vec4 NN = vec4(vNormal,0);
     // Compute the sines and cosines of theta for each of
     //   the three axes in one computation.
     vec3 angles = radians( theta );
@@ -51,12 +60,12 @@ main()
 </script>
 
 <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
-<!-- <script type="text/javascript" src='../Common/webgl-utils.js'></script>
+<script type="text/javascript" src='../Common/webgl-utils.js'></script>
 <script type="text/javascript" src='../Common/initShaders.js'></script>
-<script type="text/javascript" src='../Common/MV.js'></script> -->
-<script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/webgl-utils.js'></script>
+<script type="text/javascript" src='../Common/MV.js'></script>
+<!-- <script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/webgl-utils.js'></script>
 <script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/initShaders.js'></script>
-<script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/MV.js'></script>
+<script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/MV.js'></script> -->
 <script type="text/javascript" src='cad.js'></script>
 <link href="cad.css" rel="stylesheet"></link>
 
@@ -72,7 +81,7 @@ main()
     </select>
     <button id='create' onClick='createNew();' title='Generate a new quadric with default values'>Create new</button>
     <div>
-        <span class='create-label'>Orientation (about origin):  </span>
+        <span class='create-label'>Orientation:  </span>
         <span>
             <span class='dimension-label'>X angle: </span>
             <input class='slider' id='xSlider' type='range' value='0' min='-180' max='180'/>
@@ -98,14 +107,14 @@ main()
             <label class='dimension-value' id='radius'>0.3 units</label>
         </span>
         <span>
-            <span class='dimension-label'>Length (cone/cylinder only): </span>
-            <input class='slider' id='lengthSlider' type='range' value='0.5' min='0.1' max='1' step='0.01'/>
-            <label class='dimension-value' id='length'>0.5 units</label>
+            <span class='dimension-label'>Height (cone/cylinder only): </span>
+            <input class='slider' id='heightSlider' type='range' value='0.5' min='0.1' max='1' step='0.01'/>
+            <label class='dimension-value' id='height'>0.5 units</label>
         </span>
         <button class='resetButton' onClick='resetDimensions();'>Reset</button>
     </div>
     <div>
-        <span class='create-label'>Position:  </span>
+        <span class='create-label'>Position:</span>
         <span>
             <span class='dimension-label'>X: </span>
             <input class='slider' id='xPosSlider' name='xPosSlider' type='range' value='0' min='-1' max='1' step='0.01'/>
@@ -123,12 +132,39 @@ main()
         </span>
         <button class='resetButton' onClick='resetPosition();'>Reset</button>
     </div>
+    <div>
+        <span class='create-label'>Lights:</span>
+        <span>
+            <span class='dimension-label'>Ambient: </span>
+            <input class='slider' id='ambientSlider' name='ambientSlider' type='range' value='50' min='0' max='100' step='1'/>
+            <label class='dimension-value' id='ambientPercent'>50%</label>
+        </span>
+        <span>
+            <span class='dimension-label'>Diffuse: </span>
+            <input class='slider' id='diffuseSlider' name='diffuseSlider' type='range' value='50' min='0' max='100' step='1'/>
+            <label class='dimension-value' id='diffusePercent'>50%</label>
+        </span>
+        <span>
+            <span class='dimension-label'>Specular: </span>
+            <input class='slider' id='specularSlider' name='specularSlider' type='range' value='50' min='0' max='100' step='1'/>
+            <label class='dimension-value' id='specularPercent'>50%</label>
+        </span>
+        <button class='resetButton' onClick='resetLighting();'>Reset</button>
+    </div>
     </br>
     <div>
         <button id='save' onClick='addQuadric();' title='Commit quadric to canvas and reset controls'>Save to canvas</button>
         <button onClick='resetAll();'>Reset all controls</button>
     </div>
 </div>
+</br>
+
+<div id='canvasDiv'>
+    <canvas id="gl-canvas" width="800" height="800">
+        Oops ... your browser doesn't support the HTML5 canvas element
+    </canvas>
+</div>
+
 <div>
     <span class='create-label'>Canvas orientation:  </span>
     <span>
@@ -147,13 +183,6 @@ main()
         <label class='dimension-value' id='zCanvasAngle'>0 degrees</label>
     </span>
     <button class='resetButton' onClick='resetCanvasOrientation();'>Reset</button>
-</div>
-</br>
-
-<div id='canvasDiv'>
-    <canvas id="gl-canvas" width="800" height="800">
-        Oops ... your browser doesn't support the HTML5 canvas element
-    </canvas>
 </div>
 
 </body>

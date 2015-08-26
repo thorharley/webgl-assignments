@@ -9,13 +9,16 @@ var RED = vec4(1.0, 0.0, 0.0, 1.0);
 var GREEN = vec4(0.4, 0.86, 0.4, 1.0);
 var DEGREES_PER_STEP = 6;
 var DEFAULT_RADIUS = 0.3;
-var DEFAULT_LENGTH = 0.5;
+var DEFAULT_HEIGHT = 0.5;
 var DEFAULT_X = 0;
 var DEFAULT_Y = 0;
 var DEFAULT_Z = 0;
 var DEFAULT_X_ANGLE = 0;
 var DEFAULT_Y_ANGLE = 0;
 var DEFAULT_Z_ANGLE = 0;
+var DEFAULT_AMBIENT = 50;
+var DEFAULT_DIFFUSE = 50;
+var DEFAULT_SPECULAR = 50;
 var DEFAULT_X_CANVAS_ANGLE = 0;
 var DEFAULT_Y_CANVAS_ANGLE = -20;
 var DEFAULT_Z_CANVAS_ANGLE = 0;
@@ -24,6 +27,8 @@ var conicPoints = [];
 var circlePoints = [];
 var sheetPoints = [];
 
+var normalsArray = [];
+
 var conicPointsCommitted = [];
 var circlePointsCommitted = [];
 var sheetPointsCommitted = [];
@@ -31,10 +36,13 @@ var sheetPointsCommitted = [];
 var selectedQuadric = 'sphere';
 var theta = [DEFAULT_X_CANVAS_ANGLE, DEFAULT_Y_CANVAS_ANGLE, DEFAULT_Z_CANVAS_ANGLE];
 var radius = DEFAULT_RADIUS;
-var length = DEFAULT_LENGTH;
+var height = DEFAULT_HEIGHT;
 var xPos = DEFAULT_X;
 var yPos = DEFAULT_Y;
 var zPos = DEFAULT_Z;
+var ambient = DEFAULT_AMBIENT;
+var diffuse = DEFAULT_DIFFUSE;
+var specular = DEFAULT_SPECULAR;
 var xAngle = DEFAULT_X_ANGLE;
 var yAngle = DEFAULT_Y_ANGLE;
 var zAngle = DEFAULT_Z_ANGLE;
@@ -42,12 +50,13 @@ var zAngle = DEFAULT_Z_ANGLE;
 var hasEditableQuadric = false;
 
 var thetaLoc;
-var vBuffer;
+var vBuffer, nBuffer;
 
 window.onload = function init() {
     canvas = document.getElementById("gl-canvas");
 
     initUi();
+    initLighting();
 
     gl = WebGLUtils.setupWebGL(canvas);
     if (!gl) {
@@ -65,9 +74,16 @@ window.onload = function init() {
     var program = initShaders(gl, "vertex-shader", "fragment-shader");
     gl.useProgram(program);
 
+    nBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
+ 
+    var vNormal = gl.getAttribLocation(program, "vNormal");
+    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
+    //gl.bufferData( gl.ARRAY_BUFFER, flatten(normalsArray), gl.STATIC_DRAW );
+
     vBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(circlePoints), gl.STATIC_DRAW);
 
     var vPosition = gl.getAttribLocation(program, "vPosition");
     gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
@@ -79,19 +95,36 @@ window.onload = function init() {
     render();
 }
 
+function initLighting() {
+    var lightPosition = vec4(1.0, 1.0, 1.0, 0.0 );
+    var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
+    var lightDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
+    var lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+
+    var materialAmbient = vec4( 1.0, 0.0, 1.0, 1.0 );
+    var materialDiffuse = vec4( 1.0, 0.8, 0.0, 1.0);
+    var materialSpecular = vec4( 1.0, 0.8, 0.0, 1.0 );
+    var materialShininess = 100.0;
+}
+
 function initUi() {
     $("#quadric").on("change", onSelectChange);
     $("#xCanvasSlider").on("input", onCanvasAngleChange);
     $("#yCanvasSlider").on("input", onCanvasAngleChange);
     $("#zCanvasSlider").on("input", onCanvasAngleChange);
     $("#radiusSlider").on("input", onRadiusChange);
-    $("#lengthSlider").on("input", onLengthChange);
+    $("#heightSlider").on("input", onHeightChange);
     $("#xPosSlider").on("input", onXPosChange);
     $("#yPosSlider").on("input", onYPosChange);
     $("#zPosSlider").on("input", onZPosChange);
     $("#xSlider").on("input", onAngleChange);
     $("#ySlider").on("input", onAngleChange);
     $("#zSlider").on("input", onAngleChange);
+
+    $("#ambientSlider").on("input", onAmbientChange);
+    $("#diffuseSlider").on("input", onDiffuseChange);
+    $("#specularSlider").on("input", onSpecularChange);
+
     var option = $("#quadric")[0].selectedOptions[0].value;
     selectedQuadric = option;
 }
@@ -100,6 +133,7 @@ function resetControls() {
     resetOrientation();
     resetDimensions();
     resetPosition();
+    resetLighting();
     // resetCanvasOrientation();
 }
 var resetOrientation = function() {
@@ -113,9 +147,9 @@ var resetOrientation = function() {
 }
 var resetDimensions = function() {
     $("#radiusSlider").val(DEFAULT_RADIUS).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_RADIUS + ' units');
-    $("#lengthSlider").val(DEFAULT_LENGTH).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_LENGTH + ' units');
+    $("#heightSlider").val(DEFAULT_HEIGHT).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_HEIGHT + ' units');
     radius = DEFAULT_RADIUS;
-    length = DEFAULT_LENGTH;
+    height = DEFAULT_HEIGHT;
     buildVertices();
 }
 var resetPosition = function() {
@@ -126,6 +160,14 @@ var resetPosition = function() {
     yPos = DEFAULT_Y;
     zPos = DEFAULT_Z;
     buildVertices();
+}
+var resetLighting = function() {
+    $("#ambientSlider").val(DEFAULT_AMBIENT).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_AMBIENT + '%');
+    $("#diffuseSlider").val(DEFAULT_DIFFUSE).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_DIFFUSE + '%');
+    $("#specularSlider").val(DEFAULT_SPECULAR).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_SPECULAR + '%');
+    ambient = DEFAULT_AMBIENT;
+    diffuse = DEFAULT_DIFFUSE;
+    specular = DEFAULT_SPECULAR;
 }
 var resetCanvasOrientation = function() {
     $("#xCanvasSlider").val(DEFAULT_X_CANVAS_ANGLE).parent().find('.dimension-value')[0].innerHTML = (DEFAULT_X_CANVAS_ANGLE + ' degrees');
@@ -193,9 +235,9 @@ var onRadiusChange = function(e) {
     $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + ' units');
     buildVertices();
 }
-var onLengthChange = function(e) {
+var onHeightChange = function(e) {
     var value = e.target.value;
-    length = parseFloat(value);
+    height = parseFloat(value);
     $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + ' units');
     buildVertices();
 }
@@ -216,6 +258,21 @@ var onZPosChange = function(e) {
     zPos = parseFloat(value);
     $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + ' units');
     buildVertices();
+}
+var onAmbientChange = function(e) {
+    var value = e.target.value;
+    ambient = parseFloat(value);
+    $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + '%');
+}
+var onDiffuseChange = function(e) {
+    var value = e.target.value;
+    diffuse = parseFloat(value);
+    $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + '%');
+}
+var onSpecularChange = function(e) {
+    var value = e.target.value;
+    specular = parseFloat(value);
+    $(e.target).parent().find('.dimension-value')[0].innerHTML = (value + '%');
 }
 
 function buildVertices() {
@@ -257,7 +314,7 @@ function cone() {
 
 function cylinder() {
     circle(0);
-    circle(length);
+    circle(height);
     sheet();
 }
 
@@ -369,21 +426,38 @@ function circle(xOffset) {
 
 function conic() {
     var vertices = [];
+    var normals = [];
     for (var i = 0; i < 360; i += DEGREES_PER_STEP) {
-        vertices.push(translate(rotate(vec4(length, 0, 0, 1.0))));
+
         var angle1 = i * 2 * Math.PI / 360;
         var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
-        vertices.push(translate(rotate(vec4(0, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0))));
-        vertices.push(translate(rotate(vec4(0, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0))));
+
+        var p1 = vec4(height, 0, 0, 1.0);
+        var p2 = vec4(0, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0);
+        var p3 = vec4(0, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0);
+        var t1 = subtract(p1, p2);
+        var t2 = subtract(p1, p3);
+        var normal = normalize(vec3(cross(t1, t2)));
+
+        vertices.push(translate(rotate(p1)));
+        vertices.push(translate(rotate(p2)));
+        vertices.push(translate(rotate(p3)));
+        normals.push(normal);
+        normals.push(normal);
+        normals.push(normal);
 
     };
     for (var j = 0; j < 3 * 360 / DEGREES_PER_STEP; ++j) {
         var v1 = vertices[j];
         conicPoints.push(vertices[j]);
+        normalsArray.push(normals[j]);
     }
     conicPoints.push(vertices[3 * 360 / DEGREES_PER_STEP - 1]);
     conicPoints.push(vertices[3 * 360 / DEGREES_PER_STEP - 1]);
     conicPoints.push(vertices[3 * 360 / DEGREES_PER_STEP - 1]);
+    normalsArray.push(normals[3 * 360 / DEGREES_PER_STEP - 1]);
+    normalsArray.push(normals[3 * 360 / DEGREES_PER_STEP - 1]);
+    normalsArray.push(normals[3 * 360 / DEGREES_PER_STEP - 1]);
 }
 
 function sheet() {
@@ -393,8 +467,8 @@ function sheet() {
         var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
         vertices.push(translate(rotate(vec4(0, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0))));
         vertices.push(translate(rotate(vec4(0, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0))));
-        vertices.push(translate(rotate(vec4(length, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0))));
-        vertices.push(translate(rotate(vec4(length, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0))));
+        vertices.push(translate(rotate(vec4(height, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0))));
+        vertices.push(translate(rotate(vec4(height, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0))));
     };
     for (var j = 0; j < 4 * 360 / DEGREES_PER_STEP; ++j) {
         sheetPoints.push(vertices[j]);
@@ -431,8 +505,6 @@ function translate(v) {
 
 function render() {
     if (!vBuffer) return;
-    gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(circlePoints), gl.DYNAMIC_DRAW);
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -440,6 +512,12 @@ function render() {
 
     // Render current quadric
 
+    gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(normalsArray), gl.DYNAMIC_DRAW );
+
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(circlePoints), gl.DYNAMIC_DRAW);
     for (var i = 0; i < circlePoints.length; i += 3) {
         gl.uniform4fv(fColor, flatten(RED));
         gl.drawArrays(gl.TRIANGLE_FAN, i, 3);
