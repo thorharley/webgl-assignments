@@ -2,7 +2,7 @@
 
 var canvas;
 var gl;
-var fColor;
+// var fColor;
 
 var BLACK = vec4(0.0, 0.0, 0.0, 1.0);
 var RED = vec4(1.0, 0.0, 0.0, 1.0);
@@ -47,6 +47,12 @@ var xAngle = DEFAULT_X_ANGLE;
 var yAngle = DEFAULT_Y_ANGLE;
 var zAngle = DEFAULT_Z_ANGLE;
 
+var materialShininess = 300.0;
+var lightPosition;
+var ambientProduct;
+var diffuseProduct;
+var specularProduct;
+
 var hasEditableQuadric = false;
 
 var thetaLoc;
@@ -89,22 +95,40 @@ window.onload = function init() {
     gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vPosition);
 
-    fColor = gl.getUniformLocation(program, "fColor");
+    //fColor = gl.getUniformLocation(program, "fColor");
     thetaLoc = gl.getUniformLocation(program, "theta");
+
+    gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"),
+       flatten(ambientProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"),
+       flatten(diffuseProduct) );
+    gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"),
+       flatten(specularProduct) );
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"),
+       flatten(lightPosition) );
+
+    gl.uniform1f(gl.getUniformLocation(program,
+       "shininess"),materialShininess);
+
 
     render();
 }
 
 function initLighting() {
-    var lightPosition = vec4(1.0, 1.0, 1.0, 0.0 );
+    lightPosition = vec4(0.0, 0.2, 0.2, 0.0 );
     var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0 );
     var lightDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
     var lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
 
-    var materialAmbient = vec4( 1.0, 0.0, 1.0, 1.0 );
-    var materialDiffuse = vec4( 1.0, 0.8, 0.0, 1.0);
-    var materialSpecular = vec4( 1.0, 0.8, 0.0, 1.0 );
-    var materialShininess = 100.0;
+    var materialAmbient = vec4( 0.2, 0.2, 0.2, 1.0 );
+    var materialDiffuse = vec4( 1.0, 0.7, 0.2, 1.0);
+    var materialSpecular = vec4( 1.0, 0.7, 0.2, 1.0 );
+    
+
+    ambientProduct = mult(lightAmbient, materialAmbient);
+    diffuseProduct = mult(lightDiffuse, materialDiffuse);
+    specularProduct = mult(lightSpecular, materialSpecular);
+
 }
 
 function initUi() {
@@ -279,6 +303,7 @@ function buildVertices() {
     if (!hasEditableQuadric) {
         return;
     }
+    normalsArray = [];
     circlePoints = [];
     sheetPoints = [];
     conicPoints = [];
@@ -409,19 +434,35 @@ function circleStrip(startLat, stopLat) {
 
 function circle(xOffset) {
     var vertices = [];
+    var normals = [];
     for (var i = 0; i < 360; i += DEGREES_PER_STEP) {
-        vertices.push(translate(rotate(vec4(xOffset, 0, 0, 1.0))));
         var angle1 = i * 2 * Math.PI / 360;
         var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
-        vertices.push(translate(rotate(vec4(xOffset, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0))));
-        vertices.push(translate(rotate(vec4(xOffset, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0))));
+
+        var p1 = vec4(xOffset, 0, 0, 1.0);
+        var p2 = vec4(xOffset, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0);
+        var p3 = vec4(xOffset, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0);
+        var t1 = subtract(p2, p1);
+        var t2 = subtract(p3, p1);
+        var normal = normalize(vec3(cross(t2, t1)));
+
+        vertices.push(translate(rotate(p1)));
+        normals.push(normal);
+        vertices.push(translate(rotate(p2)));
+        normals.push(normal);
+        vertices.push(translate(rotate(p3)));
+        normals.push(normal);
     };
     for (var j = 0; j < 3 * 360 / DEGREES_PER_STEP; ++j) {
         circlePoints.push(vertices[j]);
+        normalsArray.push(normals[j]);
     }
     circlePoints.push(vertices[3 * 360 / DEGREES_PER_STEP - 1]);
     circlePoints.push(vertices[3 * 360 / DEGREES_PER_STEP - 1]);
     circlePoints.push(vertices[3 * 360 / DEGREES_PER_STEP - 1]);
+    normalsArray.push(normals[3 * 360 / DEGREES_PER_STEP - 1]);
+    normalsArray.push(normals[3 * 360 / DEGREES_PER_STEP - 1]);
+    normalsArray.push(normals[3 * 360 / DEGREES_PER_STEP - 1]);
 }
 
 function conic() {
@@ -435,20 +476,20 @@ function conic() {
         var p1 = vec4(height, 0, 0, 1.0);
         var p2 = vec4(0, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0);
         var p3 = vec4(0, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0);
-        var t1 = subtract(p1, p2);
-        var t2 = subtract(p1, p3);
-        var normal = normalize(vec3(cross(t1, t2)));
+        var t1 = subtract(p2, p1);
+        var t2 = subtract(p3, p1);
+        var normal = normalize(vec3(cross(t2, t1)));
 
         vertices.push(translate(rotate(p1)));
+        normals.push(normal);
         vertices.push(translate(rotate(p2)));
+        normals.push(normal);
         vertices.push(translate(rotate(p3)));
-        normals.push(normal);
-        normals.push(normal);
         normals.push(normal);
 
     };
     for (var j = 0; j < 3 * 360 / DEGREES_PER_STEP; ++j) {
-        var v1 = vertices[j];
+        //var v1 = vertices[j];
         conicPoints.push(vertices[j]);
         normalsArray.push(normals[j]);
     }
@@ -519,9 +560,9 @@ function render() {
     gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(circlePoints), gl.DYNAMIC_DRAW);
     for (var i = 0; i < circlePoints.length; i += 3) {
-        gl.uniform4fv(fColor, flatten(RED));
+        // gl.uniform4fv(fColor, flatten(RED));
         gl.drawArrays(gl.TRIANGLE_FAN, i, 3);
-        gl.uniform4fv(fColor, flatten(BLACK));
+        // gl.uniform4fv(fColor, flatten(BLACK));
         gl.drawArrays(gl.LINE_LOOP, i, 3);
     }
 
@@ -529,9 +570,9 @@ function render() {
     gl.bufferData(gl.ARRAY_BUFFER, flatten(sheetPoints), gl.DYNAMIC_DRAW);
 
     for (var i = 0; i < sheetPoints.length; i += 4) {
-        gl.uniform4fv(fColor, flatten(RED));
+        // gl.uniform4fv(fColor, flatten(RED));
         gl.drawArrays(gl.TRIANGLE_FAN, i, 4);
-        gl.uniform4fv(fColor, flatten(BLACK));
+        // gl.uniform4fv(fColor, flatten(BLACK));
         gl.drawArrays(gl.LINE_LOOP, i, 4);
     }
 
@@ -539,9 +580,9 @@ function render() {
     gl.bufferData(gl.ARRAY_BUFFER, flatten(conicPoints), gl.DYNAMIC_DRAW);
 
     for (var i = 0; i < conicPoints.length; i += 3) {
-        gl.uniform4fv(fColor, flatten(RED));
+        // gl.uniform4fv(fColor, flatten(RED));
         gl.drawArrays(gl.TRIANGLE_FAN, i, 3);
-        gl.uniform4fv(fColor, flatten(BLACK));
+        // gl.uniform4fv(fColor, flatten(BLACK));
         gl.drawArrays(gl.LINE_LOOP, i, 3);
     }
 
@@ -551,9 +592,9 @@ function render() {
     gl.bufferData(gl.ARRAY_BUFFER, flatten(circlePointsCommitted), gl.DYNAMIC_DRAW);
 
     for (var i = 0; i < circlePointsCommitted.length; i += 3) {
-        gl.uniform4fv(fColor, flatten(GREEN));
+        // gl.uniform4fv(fColor, flatten(GREEN));
         gl.drawArrays(gl.TRIANGLE_FAN, i, 3);
-        gl.uniform4fv(fColor, flatten(BLACK));
+        // gl.uniform4fv(fColor, flatten(BLACK));
         gl.drawArrays(gl.LINE_LOOP, i, 3);
     }
 
@@ -561,9 +602,9 @@ function render() {
     gl.bufferData(gl.ARRAY_BUFFER, flatten(sheetPointsCommitted), gl.DYNAMIC_DRAW);
 
     for (var i = 0; i < sheetPointsCommitted.length; i += 4) {
-        gl.uniform4fv(fColor, flatten(GREEN));
+        // gl.uniform4fv(fColor, flatten(GREEN));
         gl.drawArrays(gl.TRIANGLE_FAN, i, 4);
-        gl.uniform4fv(fColor, flatten(BLACK));
+        // gl.uniform4fv(fColor, flatten(BLACK));
         gl.drawArrays(gl.LINE_LOOP, i, 4);
     }
 
@@ -571,9 +612,9 @@ function render() {
     gl.bufferData(gl.ARRAY_BUFFER, flatten(conicPointsCommitted), gl.DYNAMIC_DRAW);
 
     for (var i = 0; i < conicPointsCommitted.length; i += 3) {
-        gl.uniform4fv(fColor, flatten(GREEN));
+        // gl.uniform4fv(fColor, flatten(GREEN));
         gl.drawArrays(gl.TRIANGLE_FAN, i, 3);
-        gl.uniform4fv(fColor, flatten(BLACK));
+        // gl.uniform4fv(fColor, flatten(BLACK));
         gl.drawArrays(gl.LINE_LOOP, i, 3);
     }
 
