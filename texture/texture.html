@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+
+attribute vec4 vPosition;
+attribute vec3 vNormal;
+attribute  vec2 vTexCoord;
+attribute  vec4 vTexCoord2;
+attribute  vec4 vColor;
+varying vec4 fColor;
+varying vec2 fTexCoord;
+varying vec4 fTexCoord2;
+
+
+uniform vec3 theta;
+
+uniform vec4 ambientProduct;
+uniform vec4, diffuseProduct1, specularProduct1;
+uniform vec4, diffuseProduct2, specularProduct2;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform vec4 lightPosition1;
+uniform vec4 lightPosition2;
+uniform float shininess;
+
+void main()
+{
+    fTexCoord = vTexCoord;
+    fTexCoord2 = vTexCoord2;
+
+    vec3 pos = -(modelViewMatrix * vPosition).xyz;
+    
+    vec3 light1 = lightPosition1.xyz;
+    vec3 light2 = lightPosition2.xyz;
+    vec3 L1 = normalize( light1 - pos );
+    vec3 L2 = normalize( light2 - pos );
+
+    vec3 E = normalize( -pos );
+    vec3 H1 = normalize( L1 + E );
+    vec3 H2 = normalize( L2 + E );
+    
+    vec4 NN = vec4(vNormal,0);
+
+    // Transform vertex normal into eye coordinates
+       
+    vec3 N = normalize( (modelViewMatrix*NN).xyz);
+
+    // Compute terms in the illumination equation
+    vec4 ambient = ambientProduct;
+
+    float Kd1 = max( dot(L1, N), 0.0 );
+    vec4  diffuse1 = Kd1*diffuseProduct1;
+    float Kd2 = max( dot(L2, N), 0.0 );
+    vec4  diffuse2 = Kd2*diffuseProduct2;
+
+    float Ks1 = pow( max(dot(N, H1), 0.0), shininess );
+    vec4  specular1 = Ks1 * specularProduct1;
+    float Ks2 = pow( max(dot(N, H2), 0.0), shininess );
+    vec4  specular2 = Ks2 * specularProduct2;
+    
+    if ( dot(L1, N) < 0.0 ) {
+        specular1 = vec4(0.0, 0.0, 0.0, 1.0);
+    } 
+    if ( dot(L2, N) < 0.0 ) {
+        specular2 = vec4(0.0, 0.0, 0.0, 1.0);
+    } 
+
+    gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+    fColor = ambient + diffuse1 + specular1 + diffuse2 + specular2;
+    fColor.a = 1.0;
+}
+
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+
+precision mediump float;
+
+varying vec4 fColor;
+varying vec2 fTexCoord;
+varying vec4 fTexCoord2;
+
+uniform sampler2D Tex0;
+#define M_PI 3.1415926535897932384626433832795
+
+void main()
+{
+   //  float r = fTexCoord2[0];
+   //  float x = fTexCoord2[1];
+   //  float y = fTexCoord2[2];
+   //  float z = fTexCoord2[3];
+   //  float polar = acos(y/r);
+   //  float azimuthal = atan(x,z);
+   //  float index1 = ((polar/M_PI));
+   //  float index2 = ((azimuthal*0.5/M_PI + 0.5));
+   //  vec2 indices = vec2(index1,index2);
+
+   // gl_FragColor = fColor*(texture2D(Tex0, indices));
+  gl_FragColor = fColor*(texture2D(Tex0, fTexCoord));
+}
+</script>
+
+<script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
+<!-- <script type="text/javascript" src='../Common/webgl-utils.js'></script>
+<script type="text/javascript" src='../Common/initShaders.js'></script>
+<script type="text/javascript" src='../Common/MV.js'></script> -->
+<script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/webgl-utils.js'></script>
+<script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/initShaders.js'></script>
+<script type="text/javascript" src='http://www.cs.unm.edu/~angel/COURSERA/CODE/Common/MV.js'></script>
+<script type="text/javascript" src='texture.js'></script>
+<link href="texture.css" rel="stylesheet"></link>
+
+<body>
+
+<div>
+    <h2>WebGL Lighting Assignment</h2>
+    <span class='create-label'>Quadric: </span>
+    <select id='quadric'>
+        <option value='sphere' selected='true'>Sphere</option>
+        <option value='cone'>Cone</option>
+        <option value='cylinder'>Cylinder</option>
+    </select>
+    <!-- <button id='create' onClick='createNew();' title='Generate a new quadric with default values'>Generate</button> -->
+    <div>
+        <span class='create-label'>Dimensions:  </span>
+        <span>
+            <span class='dimension-label'>Radius: </span>
+            <input class='slider' id='radiusSlider' type='range' value='0.6' min='0.05' max='1' step='0.05'/>
+            <label class='dimension-value' id='radius'>0.6 units</label>
+        </span>
+        <span>
+            <span class='dimension-label'>Height (cone/cylinder only): </span>
+            <input class='slider' id='heightSlider' type='range' value='0.5' min='0.1' max='1' step='0.01'/>
+            <label class='dimension-value' id='height'>0.5 units</label>
+        </span>
+        <button class='resetButton' onClick='resetDimensions();'>Reset</button>
+    </div>
+
+    <div>
+        <span class='create-label'>Orientation:   </span>
+        <span class='dimension-label'>X angle: </span>
+        <span> 
+            <input class='slider' id='xSlider' name='xSlider' type='range' value='0' min='-180' max='180' step='1'/>
+            <label class='dimension-value'>0 degrees</label>
+        </span>
+        <span class='dimension-label'>Y angle: </span>
+        <span> 
+            <input class='slider' id='ySlider' name='ySlider' type='range' value='0' min='-180' max='180' step='1'/>
+            <label class='dimension-value'>0 degrees</label>
+        </span>
+        <span class='dimension-label'>Z angle: </span>
+        <span> 
+            <input class='slider' id='zSlider' name='zSlider' type='range' value='0' min='-180' max='180' step='1'/>
+            <label class='dimension-value'>0 degrees</label>
+        </span>
+        <button class='resetButton' onClick='resetOrientation();'>Reset</button>
+    </div>
+
+    <div>
+        <span class='create-label'>Ambient Light:</span>
+        <span>
+            <input class='slider' id='ambientSlider' name='ambientSlider' type='range' value='20' min='0' max='100' step='1'/>
+            <label class='dimension-value' id='ambientPercent'>20%</label>
+        </span>
+    </div>
+
+    <div>
+        <span class='create-label'>Light 1:   </span>
+        On:<input type="checkbox" id="lightOn1" name="lightOn2" value="orbit1" checked/>
+        Orbit (x-axis)<input type="checkbox" id="orbit1" name="orbit1" value="orbit1" checked/>
+        <span class='dimension-label'>Distance: </span>
+            <input class='slider' id='distanceSlider1' name='distanceSlider1' type='range' value='4' min='1' max='10' step='1'/>
+            <label class='dimension-value' id='distance1'>4</label>
+        </span>
+        <span class='dimension-label'>Speed: </span>
+        <span> 
+            <input class='slider' id='speedSlider1' name='speedSlider1' type='range' value='0.02' min='0' max='0.2' step='0.005'/>
+            <label class='dimension-value' id='speed1'>0.02</label>
+        </span>
+        <span class='dimension-label'>Diffuse: </span>
+        <span> 
+            <input class='slider' id='diffuseSlider1' name='diffuseSlider1' type='range' value='50' min='0' max='100' step='1'/>
+            <label class='dimension-value' id='diffusePercent1'>50%</label>
+        </span>
+        <span>
+            <span class='dimension-label'>Specular: </span>
+        <span> 
+            <input class='slider' id='specularSlider1' name='specularSlider1' type='range' value='50' min='0' max='100' step='1'/>
+            <label class='dimension-value' id='specularPercent1'>50%</label>
+        </span>
+    </div>
+    <div>
+        <span class='create-label'>Light 2:   </span>
+        On:<input type="checkbox" id="lightOn2" name="lightOn2" value="orbit2"/>
+        Orbit (y-axis)<input type="checkbox" id="orbit2" name="orbit2" value="orbit2" checked/>
+        <span class='dimension-label'>Distance: </span>
+        <span> 
+            <input class='slider' id='distanceSlider2' name='distanceSlider2' type='range' value='4' min='1' max='10' step='1'/>
+            <label class='dimension-value' id='distance2'>4</label>
+        </span>
+        <span class='dimension-label'>Speed: </span>
+        <span> 
+            <input class='slider' id='speedSlider2' name='speedSlider2' type='range' value='0.02' min='0' max='0.2' step='0.005'/>
+            <label class='dimension-value' id='speed2'>0.02</label>
+        </span>
+        <span class='dimension-label'>Diffuse: </span>
+        <span> 
+            <input class='slider' id='diffuseSlider2' name='diffuseSlider2' type='range' value='50' min='0' max='100' step='1'/>
+            <label class='dimension-value' id='diffusePercent2'>50%</label>
+        </span>
+        <span>
+            <span class='dimension-label'>Specular: </span>
+        <span> 
+            <input class='slider' id='specularSlider2' name='specularSlider2' type='range' value='50' min='0' max='100' step='1'/>
+            <label class='dimension-value' id='specularPercent2'>50%</label>
+        </span>
+    </div>
+    </br>
+    <input type="checkbox" id="tumble" name="tumble" value="tumble"/>Tumble quadric
+    </br>
+<!--     <div>
+        <button onClick='resetAll();'>Reset all controls</button>
+    </div> -->
+</div>
+</br>
+
+<div id='canvasDiv'>
+    <canvas id="gl-canvas" width="800" height="800">
+        Oops ... your browser doesn't support the HTML5 canvas element
+    </canvas>
+</div>
+
+</body>
+</html>

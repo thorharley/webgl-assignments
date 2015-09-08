@@ -1,0 +1,29 @@
+body {
+	position: relative;
+  font: 12px sans-serif;
+}
+canvas {
+  border: solid 1px #000000;
+}
+input {
+  width: 50px;
+}
+.create-label {
+  font-size: 14px;
+  font-weight: bold;
+}
+.dimension-label {
+  font-weight: bold;
+}
+.dimension-value {
+  margin-right: 20px;
+}
+#create {
+  background-color: #dd3333
+}
+#save {
+  background-color: #66dd66
+}
+.resetButton {
+  font-size: 10px;
+}
