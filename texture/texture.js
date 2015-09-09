@@ -3,7 +3,7 @@
 var canvas;
 var gl;
 
-var DEGREES_PER_STEP = 10;
+var DEGREES_PER_STEP = 6;
 var DEFAULT_RADIUS = 0.6;
 var DEFAULT_HEIGHT = 0.5;
 var DEFAULT_X = 0;
@@ -26,25 +26,15 @@ var viewerPos;
 var program
 
 var capPoints = [];
-var conicPoints = [];
-var circlePoints = [];
-var sheetPoints = [];
 var stripPoints = [];
 
 var capNormalsArray = [];
-var circleNormalsArray = [];
 var stripNormalsArray = [];
-var sheetNormalsArray = [];
-var conicNormalsArray = [];
 
 var capTexCoordsArray = [];
 var stripTexCoordsArray = [];
 
-var conicPointsCommitted = [];
-var circlePointsCommitted = [];
-var sheetPointsCommitted = [];
-
-var selectedQuadric = 'sphere';
+var selectedQuadric = 'image';
 var radius = DEFAULT_RADIUS;
 var height = DEFAULT_HEIGHT;
 var xPos = DEFAULT_X;
@@ -137,28 +127,34 @@ window.onload = function init() {
 
     gl.uniformMatrix4fv( gl.getUniformLocation(program, "projectionMatrix"), false, flatten(projection));
 
-    tBuffer = gl.createBuffer();
-    gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer);
-   
-    var vTexCoord = gl.getAttribLocation( program, "vTexCoord" );
-    gl.vertexAttribPointer( vTexCoord, 2, gl.FLOAT, false, 0, 0 );
-    gl.enableVertexAttribArray( vTexCoord );
 
-    var vTexCoord2 = gl.getAttribLocation( program, "vTexCoord2" );
-    gl.vertexAttribPointer( vTexCoord2, 2, gl.FLOAT, false, 0, 0 );
-    gl.enableVertexAttribArray( vTexCoord2 );
-
-    createCheckerboard();
-    configureTexture();
-
-    gl.activeTexture( gl.TEXTURE0 );
-    gl.bindTexture( gl.TEXTURE_2D, texture1 );
-    gl.uniform1i(gl.getUniformLocation( program, "Tex0"), 0);
+    prepTexture();
 
     render();
 }
 
-function configureTexture() {
+function prepTexture() {
+    createCheckerboard();
+    if (selectedQuadric === 'checkered') {
+        tBuffer = gl.createBuffer();
+        gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer);
+       
+        var vTexCoord = gl.getAttribLocation( program, "vTexCoord" );
+        gl.vertexAttribPointer( vTexCoord, 2, gl.FLOAT, false, 0, 0 );
+        gl.enableVertexAttribArray( vTexCoord );
+
+        configureTextureCheckered();
+    } else if (selectedQuadric === 'image') {
+        tBuffer = gl.createBuffer();
+        gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer);
+        var vTexCoord = gl.getAttribLocation( program, "vTexCoord" );
+        gl.vertexAttribPointer( vTexCoord, 2, gl.FLOAT, false, 0, 0 );
+        gl.enableVertexAttribArray( vTexCoord );
+        configureTextureImage();
+    }
+}
+
+function configureTextureCheckered() {
     texture1 = gl.createTexture();
     gl.bindTexture( gl.TEXTURE_2D, texture1 );
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -169,6 +165,20 @@ function configureTexture() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 }
+
+function configureTextureImage() {
+    var image = document.getElementById('hubble');
+    texture1 = gl.createTexture();
+    gl.bindTexture( gl.TEXTURE_2D, texture1 );
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image );
+    gl.generateMipmap( gl.TEXTURE_2D );
+    gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR );
+    gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
+
+    gl.uniform1i(gl.getUniformLocation(program, "texture1"), 0);
+}
+
 
 function updateLighting() {
 
@@ -239,8 +249,8 @@ function initUi() {
     $("#diffuseSlider2").on("input", onDiffuse2Change);
     $("#specularSlider2").on("input", onSpecular2Change);
 
-    var option = $("#quadric")[0].selectedOptions[0].value;
-    selectedQuadric = option;
+    // var option = $("#quadric")[0].selectedOptions[0].value;
+    selectedQuadric = 'image';
 }
 
 function resetControls() {
@@ -307,6 +317,7 @@ var onSelectChange = function(e) {
     var option = e.target.selectedOptions[0].value;
     selectedQuadric = option;
     createNew();
+    prepTexture();
 }
 var onTumbleChange = function(e) {
     var checked = e.target.checked;
@@ -451,29 +462,18 @@ function buildVertices() {
     if (!hasEditableQuadric) {
         return;
     }
-    circleNormalsArray = [];
     capNormalsArray = [];
     stripNormalsArray = [];
-    sheetNormalsArray = [];
-    conicNormalsArray = [];
     capPoints = [];
-    circlePoints = [];
-    sheetPoints = [];
     stripPoints = [];
-    conicPoints = [];
     capTexCoordsArray = [];
     stripTexCoordsArray = [];
-    switch (selectedQuadric) {
-        case 'cone':
-            cone();
-            break;
-        case 'cylinder':
-            cylinder();
-            break;
-        case 'sphere':
-            sphere2();
-            break;
-    }
+    sphere();
+    // switch (selectedQuadric) {
+    //     case 'checkered':
+    //         sphere();
+    //         break;
+    // }
 }
 
 function tX(x) {
@@ -499,73 +499,18 @@ function cylinder() {
     sheet();
 }
 
-function sphere2() {
-   circleCap2(-radius, 170);
-   circleCap2(radius, 10);
-    for (var i = 10; i < 170; i += DEGREES_PER_STEP) {
-        circleStrip2(i, i + DEGREES_PER_STEP);
-    }
-}
-
 function sphere() {
-    circleCap(-radius, 170);
-    circleCap(radius, 10);
+   circleCap(-radius, 170);
+   circleCap(radius, 10);
     for (var i = 10; i < 170; i += DEGREES_PER_STEP) {
         circleStrip(i, i + DEGREES_PER_STEP);
     }
 }
 
-function circleCap(centreX, startLat) {
+function circleCap(centreY, startLat) {
     var vertices = [];
     var normals = [];
-    for (var i = 0; i < 360; i += DEGREES_PER_STEP) {
-        var angle1 = i * 2 * Math.PI / 360;
-        var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
-
-        var polarAngle = startLat * 2 * Math.PI / 360;
-
-        var x1 = radius * Math.cos(polarAngle);
-        var x2 = x1;
-        var x3 = centreX;
-
-        var y1 = radius * Math.sin(angle1) * Math.sin(polarAngle);
-        var y2 = radius * Math.sin(angle2) * Math.sin(polarAngle);
-        var y3 = 0;
-
-        var z1 = radius * Math.cos(angle1) * Math.sin(polarAngle);
-        var z2 = radius * Math.cos(angle2) * Math.sin(polarAngle);
-        var z3 = 0;
-
-        var p1 = vec4(x1, y1, z1, 1.0);
-        var p2 = vec4(x2, y2, z2, 1.0);
-        var p3 = vec4(x3, y3, z3, 1.0);
-
-        if(centreX > 0) {
-            vertices.push(p1);
-            normals.push(vec3(p1[0],p1[1],p1[2]));
-            vertices.push(p2);
-            normals.push(vec3(p2[0],p2[1],p2[2]));
-            vertices.push(p3);
-            normals.push(vec3(p3[0],p3[1],p3[2]));
-        } else {
-            vertices.push(p1);
-            normals.push(vec3(p1[0],p1[1],p1[2]));
-            vertices.push(p2);
-            normals.push(vec3(p2[0],p2[1],p2[2]));
-            vertices.push(p3);
-            normals.push(vec3(p3[0],p3[1],p3[2]));
-        }
-    };
-    for (var j = 0; j < 3 * 360 / DEGREES_PER_STEP; ++j) {
-        capPoints.push(vertices[j]);
-        capNormalsArray.push(normals[j]);
-        capTexCoordsArray.push(getTexCoords(radius, vertices[j][1], vertices[j][0], vertices[j][2]));
-    }
-}
-
-function circleCap2(centreY, startLat) {
-    var vertices = [];
-    var normals = [];
+    var textures = [];
     for (var i = -180; i < 180; i += DEGREES_PER_STEP) {
         var angle1 = i * 2 * Math.PI / 360;
         var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
@@ -589,20 +534,34 @@ function circleCap2(centreY, startLat) {
         var p3 = vec4(x3, y3, z3, 1.0);
 
         vertices.push(p1);
-        normals.push(vec3(p1[0],p1[1],p1[2]));
         vertices.push(p2);
-        normals.push(vec3(p2[0],p2[1],p2[2]));
         vertices.push(p3);
+        normals.push(vec3(p1[0],p1[1],p1[2]));
+        normals.push(vec3(p2[0],p2[1],p2[2]));
         normals.push(vec3(p3[0],p3[1],p3[2]));
+        var t1 = getTexCoords(radius, p1[0], p1[1], p1[2]);
+        var t2 = getTexCoords(radius, p2[0], p2[1], p2[2]);
+        var t3 = getTexCoords(radius, p3[0], p3[1], p3[2]);
+        if (t1[1] === 1) {
+            t1[1] = t2[1];
+        }
+        if (t2[1] === 1) {
+            t2[1] = t1[1];
+        }
+        t3[1] = (t1[1]+t2[1])/2;
+        textures.push(t1);
+        textures.push(t2);
+        textures.push(t3);
+
     };
     for (var j = 0; j < 3 * 360 / DEGREES_PER_STEP; ++j) {
         capPoints.push(vertices[j]);
         capNormalsArray.push(normals[j]);
-        capTexCoordsArray.push(getTexCoords(radius, vertices[j][0], vertices[j][1], vertices[j][2]));
+        capTexCoordsArray.push(textures[j]);
     }
 }
 
-function circleStrip2(startLat, stopLat) {
+function circleStrip(startLat, stopLat) {
     var vertices = [];
     var normals = [];
     var textures = [];
@@ -631,10 +590,6 @@ function circleStrip2(startLat, stopLat) {
         var p3 = vec4(x3, y3, z3, 1.0);
         var p4 = vec4(x4, y4, z4, 1.0);
 
-        var t1 = subtract(p2, p1);
-        var t2 = subtract(p3, p2);
-        var normal = normalize(vec3(cross(t1, t2)));
-
         vertices.push(p1);
         vertices.push(p4);
         vertices.push(p2);
@@ -647,161 +602,42 @@ function circleStrip2(startLat, stopLat) {
         normals.push(vec3(p3[0],p3[1],p3[2]));
         normals.push(vec3(p4[0],p4[1],p4[2]));
         normals.push(vec3(p2[0],p2[1],p2[2]));
-        textures.push(getTexCoords(radius, p1[0], p1[1], p1[2]));
-        textures.push(getTexCoords(radius, p4[0], p4[1], p4[2]));
-        textures.push(getTexCoords(radius, p2[0], p2[1], p2[2]));
-        textures.push(getTexCoords(radius, p3[0], p3[1], p3[2]));
-        textures.push(getTexCoords(radius, p4[0], p4[1], p4[2]));
-        textures.push(getTexCoords(radius, p2[0], p2[1], p2[2]));
+        var t1 = getTexCoords(radius, p1[0], p1[1], p1[2]);
+        var t2 = getTexCoords(radius, p4[0], p4[1], p4[2]);
+        var t3 = getTexCoords(radius, p2[0], p2[1], p2[2]);
+        var t4 = getTexCoords(radius, p3[0], p3[1], p3[2]);
+        var t5 = getTexCoords(radius, p4[0], p4[1], p4[2]);
+        var t6 = getTexCoords(radius, p2[0], p2[1], p2[2]);
+
+        if (t4[1] === 1) {
+            t4[1] = t2[1];
+        }  if (t2[1] === 1) {
+            t2[1] = t4[1];
+        }
+        if (t3[1] === 1) {
+            t3[1] = t1[1];
+        }  if (t1[1] === 1) {
+            t1[1] = t3[1];
+        }
+        if (t5[1] === 1) {
+            t5[1] = t4[1];
+        }
+        if (t6[1] === 1) {
+            t6[1] = t1[1];
+        }
+
+        textures.push(t1);
+        textures.push(t2);
+        textures.push(t3);
+        textures.push(t4);
+        textures.push(t5);
+        textures.push(t6);
 
     };
     for (var j = 0; j < 6 * 360 / DEGREES_PER_STEP; ++j) {
         stripPoints.push(vertices[j]);
         stripNormalsArray.push(normals[j]);
         stripTexCoordsArray.push(textures[j]);
-    }
-}
-
-function circleStrip(startLat, stopLat) {
-    var vertices = [];
-    var normals = [];
-    for (var i = 0; i < 360; i += DEGREES_PER_STEP) {
-        var angle1 = i * 2 * Math.PI / 360;
-        var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
-        var polarAngle1 = startLat * 2 * Math.PI / 360;
-        var polarAngle2 = stopLat * 2 * Math.PI / 360;
-        var x1 = radius * Math.cos(polarAngle1);
-        var x2 = x1;
-        var x3 = radius * Math.cos(polarAngle2);
-        var x4 = x3;
-
-        var y1 = radius * Math.sin(angle1) * Math.sin(polarAngle1);
-        var y2 = radius * Math.sin(angle2) * Math.sin(polarAngle1);
-        var y3 = radius * Math.sin(angle2) * Math.sin(polarAngle2);
-        var y4 = radius * Math.sin(angle1) * Math.sin(polarAngle2);
-
-        var z1 = radius * Math.cos(angle1) * Math.sin(polarAngle1);
-        var z2 = radius * Math.cos(angle2) * Math.sin(polarAngle1);
-        var z3 = radius * Math.cos(angle2) * Math.sin(polarAngle2);
-        var z4 = radius * Math.cos(angle1) * Math.sin(polarAngle2);
-
-        var p1 = vec4(x1, y1, z1, 1.0);
-        var p2 = vec4(x2, y2, z2, 1.0);
-        var p3 = vec4(x3, y3, z3, 1.0);
-        var p4 = vec4(x4, y4, z4, 1.0);
-
-        var t1 = subtract(p2, p1);
-        var t2 = subtract(p3, p2);
-        var normal = normalize(vec3(cross(t1, t2)));
-
-        vertices.push(p1);
-        vertices.push(p4);
-        vertices.push(p2);
-        vertices.push(p3);
-        vertices.push(p4);
-        vertices.push(p2);
-        normals.push(vec3(p1[0],p1[1],p1[2]));
-        normals.push(vec3(p4[0],p4[1],p4[2]));
-        normals.push(vec3(p2[0],p2[1],p2[2]));
-        normals.push(vec3(p3[0],p3[1],p3[2]));
-        normals.push(vec3(p4[0],p4[1],p4[2]));
-        normals.push(vec3(p2[0],p2[1],p2[2]));
-
-    };
-    for (var j = 0; j < 6 * 360 / DEGREES_PER_STEP; ++j) {
-        stripPoints.push(vertices[j]);
-        stripNormalsArray.push(normals[j]);
-        stripTexCoordsArray.push(getTexCoords(radius, vertices[j][0], vertices[j][1], vertices[j][2]));
-    }
-}
-
-function circle(xOffset, isOutsidePosX) {
-    var vertices = [];
-    var normals = [];
-    for (var i = 0; i < 360; i += DEGREES_PER_STEP) {
-        var angle1 = i * 2 * Math.PI / 360;
-        var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
-
-        var p1 = vec4(xOffset, 0, 0, 1.0);
-        var p2 = vec4(xOffset, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0);
-        var p3 = vec4(xOffset, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0);
-        var t1 = subtract(p2, p1);
-        var t2 = subtract(p3, p1);
-        var normal = isOutsidePosX ? normalize(vec3(cross(t2, t1))) : normalize(vec3(cross(t1, t2)));
-
-        vertices.push(p1);
-        normals.push(normal);
-        vertices.push(p2);
-        normals.push(normal);
-        vertices.push(p3);
-        normals.push(normal);
-    };
-    for (var j = 0; j < 3 * 360 / DEGREES_PER_STEP; ++j) {
-        circlePoints.push(vertices[j]);
-        circleNormalsArray.push(normals[j]);
-    }
-}
-
-function conic() {
-    var vertices = [];
-    var normals = [];
-    for (var i = 0; i < 360; i += DEGREES_PER_STEP) {
-
-        var angle1 = i * 2 * Math.PI / 360;
-        var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
-
-        var p1 = vec4(height, 0, 0, 1.0);
-        var p2 = vec4(0, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0);
-        var p3 = vec4(0, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0);
-        var t1 = subtract(p2, p1);
-        var t2 = subtract(p3, p1);
-        var normal = normalize(cross(t1, t2));
-
-            vertices.push(p1);
-            normals.push(vec3(p1[0],p1[1],p1[2]));
-            vertices.push(p2);
-            normals.push(vec3(p2[0],p2[1],p2[2]));
-            vertices.push(p3);
-            normals.push(vec3(p3[0],p3[1],p3[2]));
-    };
-    for (var j = 0; j < 3 * 360 / DEGREES_PER_STEP; ++j) {
-        conicPoints.push(vertices[j]);
-        conicNormalsArray.push(normals[j]);
-    }
-}
-
-function sheet() {
-    var vertices = [];
-    var normals = [];
-    for (var i = -180; i < 180; i += DEGREES_PER_STEP) {
-        var angle1 = i * 2 * Math.PI / 360;
-        var angle2 = (i + DEGREES_PER_STEP) * 2 * Math.PI / 360;
-
-        var p1 = vec4(-height/2, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0);
-        var p2 = vec4(-height/2, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0);
-        var p3 = vec4(height/2, radius * Math.sin(angle1), radius * Math.cos(angle1), 1.0);
-        var p4 = vec4(height/2, radius * Math.sin(angle2), radius * Math.cos(angle2), 1.0);
-        
-        var t1 = subtract(p2, p1);
-        var t2 = subtract(p3, p1);
-        var normal = normalize(vec3(cross(t1, t2)));
-
-        vertices.push(p1);
-        normals.push(vec3(0,p1[1],p1[2]));
-        vertices.push(p2);
-        normals.push(vec3(0,p2[1],p2[2]));
-        vertices.push(p3);
-        normals.push(vec3(0,p3[1],p3[2]));
-        vertices.push(p1);
-        normals.push(vec3(0,p1[1],p1[2]));
-        vertices.push(p3);
-        normals.push(vec3(0,p3[1],p3[2]));
-        vertices.push(p4);
-        normals.push(vec3(0,p4[1],p4[2]));
-    };
-    for (var j = 0; j < 6 * 360 / DEGREES_PER_STEP; ++j) {
-        sheetPoints.push(vertices[j]);
-        sheetNormalsArray.push(normals[j]);
     }
 }
 
@@ -840,17 +676,6 @@ function getTexCoords(r, x, y, z) {
     return vec2(index1, index2);
 }
 
-function getTexCoords2(r, x, y, z) {
-    // x = Math.abs(x) > 0.000001 ? x : 0;
-    // y = Math.abs(y) > 0.000001 ? y : 0;
-    // var polar = Math.acos(y/r);
-    // var azimuthal = Math.atan2(z,x) + Math.PI;
-    // var index1 = Math.abs(polar/(Math.PI));
-    // var index2 = Math.abs(azimuthal/(Math.PI));
-    //window.console.log(r+' '+x+' '+y+' '+z+' '+index1+' '+index2);
-    return vec4(r, x, y, z);
-}
-
 var texCoord = [
     vec2(0, 0),
     vec2(0, 1),
@@ -872,7 +697,6 @@ function createCheckerboard() {
             image1[4*i*texSize+4*j+3] = 255;
         }
     }
-
 }
 
 function render() {
@@ -907,29 +731,13 @@ function render() {
     gl.uniformMatrix4fv( gl.getUniformLocation(program, "modelViewMatrix"), false, flatten(modelView) );
 
     gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
-    gl.bufferData( gl.ARRAY_BUFFER, flatten(circleNormalsArray), gl.DYNAMIC_DRAW );
-    gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(circlePoints), gl.DYNAMIC_DRAW);
-    for (var i = 0; i < circlePoints.length; i += 3) {
-        gl.drawArrays(gl.TRIANGLE_FAN, i, 3);
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
-    gl.bufferData( gl.ARRAY_BUFFER, flatten(sheetNormalsArray), gl.DYNAMIC_DRAW );
-    gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(sheetPoints), gl.DYNAMIC_DRAW);
-
-    for (var i = 0; i < sheetPoints.length; i += 6) {
-        gl.drawArrays(gl.TRIANGLES, i, 6);
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
     gl.bufferData( gl.ARRAY_BUFFER, flatten(stripNormalsArray), gl.DYNAMIC_DRAW );
     gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(stripPoints), gl.DYNAMIC_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
-    gl.bufferData( gl.ARRAY_BUFFER, flatten(stripTexCoordsArray), gl.DYNAMIC_DRAW );
-
+    //if (selectedQuadric === 'checkered') {
+        gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
+        gl.bufferData( gl.ARRAY_BUFFER, flatten(stripTexCoordsArray), gl.DYNAMIC_DRAW );
+    //}
     for (var i = 0; i < stripPoints.length; i += 6) {
         gl.drawArrays(gl.TRIANGLES, i, 6);
     }
@@ -938,21 +746,14 @@ function render() {
     gl.bufferData( gl.ARRAY_BUFFER, flatten(capNormalsArray), gl.DYNAMIC_DRAW );
     gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(capPoints), gl.DYNAMIC_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
-    gl.bufferData( gl.ARRAY_BUFFER, flatten(capTexCoordsArray), gl.DYNAMIC_DRAW );
-
+    //if (selectedQuadric === 'checkered') {
+        gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
+        gl.bufferData( gl.ARRAY_BUFFER, flatten(capTexCoordsArray), gl.DYNAMIC_DRAW );
+   // }
     for (var i = 0; i < capPoints.length; i += 3) {
         gl.drawArrays(gl.TRIANGLES, i, 3);
     }
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
-    gl.bufferData( gl.ARRAY_BUFFER, flatten(conicNormalsArray), gl.DYNAMIC_DRAW );
-    gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(conicPoints), gl.DYNAMIC_DRAW);
-
-    for (var i = 0; i < conicPoints.length; i += 3) {
-        gl.drawArrays(gl.TRIANGLES, i, 3);
-    }
 
     requestAnimFrame(render);
 }
